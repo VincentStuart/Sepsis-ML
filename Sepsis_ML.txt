@@ -1,0 +1,203 @@
+##Class Inheritance
+##Other ML methods RandomForest, DecisionTrees and SVM
+##Model Analysis
+##Check into GitHub
+##Review Coding Standards
+##Model New Data Set
+
+
+##TBD: Refactor code into functions
+##TBD: Create classes to store models, data and results
+##TBD: Run experiments with more ML methods, including SVM, RF, ...
+##TBD: Use continuous lab results and compare to OOR data
+##TBD: NN Feature Space Analysis
+##TBD: LR Significant variables
+##TBL: import from
+##TBL: global - the global names in a module; and the local names in a function invocation
+##TBL: Coroutines?
+##TBL: Exceptions
+##TBL: TensorFlow wrapper
+##TBL: graphics
+##TBL: Modules - two different modules may both define a function maximize without confusion — users of the modules must prefix it with the module name.
+##TBL: Scoping rules 
+#	the innermost scope, which is searched first, contains the local names
+#	the scopes of any enclosing functions, which are searched starting with the nearest enclosing scope, contains non-local, but also non-global names
+#	the next-to-last scope contains the current module’s global names
+#	the outermost scope (searched last) is the namespace containing built-in names
+#	nonlocal statement - variables is read only
+#	global
+#		The global statement can be used to indicate that particular variables live in the global scope and 
+#		should be rebound there; the nonlocal statement indicates that particular variables live in an enclosing 
+#		scope and should be rebound there.
+#	https://docs.python.org/3/tutorial/classes.html
+#		9.2.1. Scopes and Namespaces Example
+##BUGS: zip error?
+
+import time 
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import patsy as ps
+from patsy import dmatrices
+import sklearn as sl
+from sklearn.neural_network import MLPClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.cross_validation import train_test_split
+from sklearn import metrics
+from sklearn.cross_validation import cross_val_score
+##For demo
+import statsmodels.api as sm
+
+#import scikit-learn as sc #Fails
+##From the Anaconda prompt
+##pip install -U scikit-learn
+##Requirement already up-to-date: scikit-learn in c:\users\vstua\anaconda3\lib\site-packages
+
+##https://docs.python.org/3/tutorial/classes.html
+##TBL: Classes and hierarchy
+##TBL: Inheritance
+##TBL: metaclasses
+##TBL: __main__???
+##TBL: Execution frame
+##TBL: Attribute - a modules variables or function - dot notation
+#	Can create attributes dynamically and 'del' delete them when done
+##TBL: Name Space - A namespace is a mapping from names to objects.
+##TBL: new class’s __dict__  example: MLPClassifier.__dict__
+##TBL: decorator expressions are the same as for function decorators
+##TBL: function versus methods objects - 9.3.3: But x.f is not the same thing as MyClass.f — it is a method object, not a function object.
+##     9.3.5: Generally speaking, instance variables are for data unique to each instance and class variables are for attributes and methods shared by all instances of the class:
+##     9.4 Each value is an object, and therefore has a class (also called its type). It is stored as object.__class__.
+##TBL: exec() or eval()
+
+##ML Classes:
+##	BaseClass - Inherit
+##	ML Class - specific modeling method (training attributes and interogate the model)
+##Attributes: Nouns
+##  Data
+##    Train
+##    Test
+##  Model Instance
+##    Model Type
+##    Parameters
+##  Analysis
+##    Scored Data (Test and Train)
+##    Probilites
+##    AUC
+##  Graphics
+##  __doc__ - doc string
+##  intialize 
+##	def __init__(self)
+##	    self.data = []	
+##Methods - Verbs
+##  ML Method specific (otherwise can I use generic functions?)
+##    Feature Space Analysis
+
+
+##TBD: setting the creation date should be done in the base class and inherited
+
+#Base Class for Sepsis Models
+#Attributes:
+#  Data
+#  Results
+#Methods:
+#  DeriveAUC
+#  Read in data
+#  Split into test and train - need a seed to be consistent across modeling methods
+
+class SepsisModel:
+    def __init__(self, name):
+        self.name = name		 #name of the model experiment instance
+        self.creation_date =  time.strftime('%a %H:%M:%S')  #use time stamp to track when a model was created##Not getting inherited?
+
+
+#ML Methodology specific class
+#Methods
+# analyze the specific type of model (e.g., NN versus SVM) 
+# TBD: Read in data and create formula automatically
+class SepsisNNModel(SepsisModel):
+    """Sepsis Neural Network Model"""
+    def __init__(self, name):
+        self.name = name		#name of the model experiment instance
+        self.ML_Method = 'NN'		#TBD: Be more specific on the type of learning (e.g., solver='lbfgs')
+        self.creation_date =  time.strftime('%a %H:%M:%S')  
+        self.filename = 'C:\\Users\\vstua\\Documents\\Documents\\VinCo\\Clients\\PrecisionDigitalHealth\\HNL\\Projects\\Python\\Data\\AllTrainingData2.txt'
+        self.formula = ''
+        self.hidden_layer_sizes = 6
+        self.max_iter = 2000
+    
+    def read_modeling_data(self):
+        with open(self.filename) as f:
+            self.table = pd.read_table(f, sep='|', index_col=0, header=0,   lineterminator='\n')
+    
+    def create_formula(self):
+        for c in self.table.columns:
+            if (c  == 'SepsisTarget'):				#target variable
+                self.formula = c + ' ~'
+            elif (self.table.columns[len(self.table.columns)-1]  == c):		#last variables do not append '+'
+                self.formula = self.formula + ' ' + c
+            else:
+                self.formula = self.formula + ' ' + c + ' + '
+    
+    def create_test_and_train(self):
+        self.y, self.X = dmatrices(self.formula, self.table, return_type="dataframe")
+        self.y = np.ravel(self.y)
+        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.X, self.y, test_size=0.3, random_state=0)
+    
+    def build_model(self):
+        self.read_modeling_data()
+        self.create_formula()
+        self.create_test_and_train()
+        self.create_NN_model()
+        self.fit_NN_model()
+        self.calculate_AUC()
+        
+    def create_NN_model(self):
+        self.clf = MLPClassifier(solver='lbfgs', alpha=1e-5, hidden_layer_sizes=(self.hidden_layer_sizes), max_iter=self.max_iter, random_state=1)    
+    
+    def fit_NN_model(self):
+        self.clf.fit(self.X_train, self.y_train)
+    
+    def calculate_AUC(self):
+        self.probs = self.clf.predict_proba(self.X_train)
+        print("Training Set AUC:",metrics.roc_auc_score(self.y_train, self.probs[:, 1]))
+        self.probs = self.clf.predict_proba(self.X_test)
+        print("Test Set AUC:",metrics.roc_auc_score(self.y_test, self.probs[:, 1]))
+
+    #Create test and training data
+    #Fit the model
+
+
+
+MyNNSepsisModel = SepsisNNModel('MyFirstExperiment')
+MyNNSepsisModel.build_model()	
+
+##
+	
+MyNNSepsisModel.read_modeling_data()
+
+MyNNSepsisModel.table.shape
+
+#Consider automating these steps when creating the object
+MyNNSepsisModel.create_formula()
+
+MyNNSepsisModel.formula
+
+    
+isinstance(MyNNSepsisModel, SepsisNNModel)
+#True
+issubclass(SepsisNNModel, SepsisModel)
+#True
+
+###NN
+#####Test scikit-learn (sklearn?)
+#http://scikit-learn.org/stable/modules/neural_networks_supervised.html
+from sklearn.neural_network import MLPClassifier
+
+##Logistic Regression
+#model = LogisticRegression()
+#model = model.fit(X, y)
+
+##############################
+# End
+##############################
+
